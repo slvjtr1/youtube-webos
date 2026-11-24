@@ -1,4 +1,4 @@
-const CONTENT_INTENT_REGEX = /^.+(?=Content)/g;
+import { launchURL } from './url-adapter';
 
 export function extractLaunchParams() {
   if (!window.launchParams) return {};
@@ -11,86 +11,8 @@ export function extractLaunchParams() {
   }
 }
 
-function getYTURL() {
-  const ytURL = new URL('https://www.youtube.com/tv#/');
-  ytURL.searchParams.append('env_forceFullAnimation', '1');
-  ytURL.searchParams.append('env_enableWebSpeech', '1');
-  ytURL.searchParams.append('env_enableVoice', '1');
-  return ytURL;
-}
-
-/**
- * Creates a new URLSearchPrams with the contents of `a` and `b`
- * @param {URLSearchParams} a
- * @param {URLSearchParams} b
- * @returns {URLSearchParams}
- */
-function concatSearchParams(a, b) {
-  return new URLSearchParams([...a.entries(), ...b.entries()]);
-}
-
 export function handleLaunch(params = {}) {
-  console.info('handleLaunch', params);
-  let ytURL = getYTURL();
-
-  // We use our custom "target" param, since launches with "contentTarget"
-  // parameter do not respect "handlesRelaunch" appinfo option. We still
-  // fallback to "contentTarget" if our custom param is not specified.
-  //
-  let { target, contentTarget = target } = params ?? {};
-
-  /** TODO: Handle google assistant
-   * Sample: {contentTarget: "v=v=<ID>", storeCaller: "voice", subReason: "voiceAgent", voiceEngine: "googleAssistant"}
-   */
-
-  switch (typeof contentTarget) {
-    case 'string': {
-      if (contentTarget.indexOf(ytURL.origin) === 0) {
-        console.info('Launching from direct contentTarget');
-        ytURL = contentTarget;
-      } else {
-        // Out of app dial launch with second screen on home: { contentTarget: 'pairingCode=<UUID>&theme=cl&dialLaunch=watch' }
-        console.info('Launching from partial contentTarget');
-        if (contentTarget.indexOf('v=v=') === 0)
-          contentTarget = contentTarget.substring(2);
-
-        ytURL.search = concatSearchParams(
-          ytURL.searchParams,
-          new URLSearchParams(contentTarget)
-        );
-      }
-      break;
-    }
-    case 'object': {
-      if (typeof contentTarget?.intent !== 'string') break;
-
-      console.info('Voice launch');
-
-      const { intent, intentParam } = contentTarget;
-      // Ctrl+F tvhtml5LaunchUrlComponentChanged & REQUEST_ORIGIN_GOOGLE_ASSISTANT in base.js for info
-      const search = ytURL.searchParams;
-      // contentTarget.intent's seen so far: PlayContent, SearchContent
-      const voiceContentIntent = intent
-        .match(CONTENT_INTENT_REGEX)?.[0]
-        ?.toLowerCase();
-
-      search.set('inApp', true);
-      search.set('vs', 9); // Voice System is VOICE_SYSTEM_LG_THINKQ
-      voiceContentIntent && search.set('va', voiceContentIntent);
-
-      // order is important
-      search.append('launch', 'voice');
-      voiceContentIntent === 'search' && search.append('launch', 'search');
-
-      search.set('vq', intentParam);
-      break;
-    }
-    default: {
-      console.info('Default launch');
-    }
-  }
-
-  window.location.href = ytURL.toString();
+  window.location.href = launchURL(params);
 }
 
 /**

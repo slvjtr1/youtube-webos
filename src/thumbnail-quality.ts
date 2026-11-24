@@ -1,3 +1,4 @@
+import { thumbnailURL } from './url-adapter';
 const webpTestImgs = {
   lossy: 'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA',
   lossless: 'UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==',
@@ -32,40 +33,6 @@ checkWebpFeature('lossy', (_, support) => {
   webpSupported = support;
 });
 
-function rewriteURL(url: URL) {
-  const YT_THUMBNAIL_PATHNAME_REGEX =
-    /vi(?:_webp)?(\/.*?\/)([a-z0-9]+?)(_\w*?)?\.[a-z]+$/g;
-
-  const YT_TARGET_THUMBNAIL_NAMES = [
-    'sddefault',
-    'hqdefault',
-    'mqdefault',
-    'default'
-  ] as const;
-
-  const isABTest = url.hostname.match(/^i\d/) !== null;
-  // Don't know how to handle A/B test thumbnails so we don't upgrade them.
-  if (isABTest) return null;
-
-  const replacementPathname = url.pathname.replace(
-    YT_THUMBNAIL_PATHNAME_REGEX,
-    (match, p1, p2, p3) => {
-      if (!YT_TARGET_THUMBNAIL_NAMES.includes(p2)) return match; // Only rewrite regular thumbnail URLs. Not shorts, etc.
-      return `${webpSupported ? 'vi_webp' : 'vi'}${p1}sddefault${p3 ?? ''}.${webpSupported ? 'webp' : 'jpg'}`;
-    }
-  );
-  if (url.pathname === replacementPathname)
-    // pathname not changed because not a regular thumbnail or already upgraded.
-    return null;
-
-  url = new URL(url);
-
-  url.pathname = replacementPathname;
-  url.search = '';
-
-  return url;
-}
-
 function parseCSSUrl(value: string): URL | undefined {
   try {
     return new URL(value.slice(4, -1).replace(/["']/g, ''));
@@ -79,7 +46,7 @@ async function upgradeBgImg(element: HTMLElement) {
   const old = parseCSSUrl(style.backgroundImage);
   if (!old) return;
 
-  const target = rewriteURL(old);
+  const target = thumbnailURL(old, webpSupported);
   if (!target) return;
 
   const lazyLoader = new Image();
@@ -151,6 +118,6 @@ import { configRead, configAddChangeListener } from './config';
 
 if (configRead('upgradeThumbnails')) enableObserver();
 
-configAddChangeListener('upgradeThumbnails', (value) =>
-  value ? enableObserver() : obs.disconnect()
+configAddChangeListener('upgradeThumbnails', () =>
+  configRead('upgradeThumbnails') ? enableObserver() : obs.disconnect()
 );

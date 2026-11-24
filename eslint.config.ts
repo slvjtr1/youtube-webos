@@ -89,7 +89,7 @@ const configs = [
 
   {
     // `ignores` field must be in the very bottom config.
-    ignores: ['dist/**/*', '**/*-polyfill.*']
+    ignores: ['dist/**/*', '**/*-polyfill.*', 'native/player-legacy.js']
   }
 ] as const satisfies Linter.Config[];
 

@@ -1,40 +1,14 @@
-/*global __YTAF_VERSION__, __YTAF_SETTINGS_ROWS__*/
-import { panelKey, preparePanel } from './native-player';
+/*global __YTAF_VERSION__*/
+import { core } from './core-runtime';
 import {
   configAddChangeListener,
   configRead,
   configWrite,
-  configGetDesc
+  configGetDesc,
+  settingsRows
 } from './config.js';
 import './ui.css';
 import { requireElement } from './player_api/helpers';
-
-const colorCodeMap = new Map([
-  [403, 'red'],
-
-  [404, 'green'],
-  [172, 'green'],
-
-  [405, 'yellow'],
-  [170, 'yellow'],
-
-  [406, 'blue'],
-  [167, 'blue'],
-  [191, 'blue']
-]);
-
-/**
- * Returns the name of the color button associated with a code or null if not a color button.
- * @param {number} charCode KeyboardEvent.charCode property from event
- * @returns {string | null} Color name or null
- */
-function getKeyColor(charCode) {
-  if (colorCodeMap.has(charCode)) {
-    return colorCodeMap.get(charCode);
-  }
-
-  return null;
-}
 
 function createConfigCheckbox(key) {
   const elmInput = document.createElement('input');
@@ -71,7 +45,7 @@ function createOptionsPanel() {
   elmHeading.textContent = 'webOS YouTube Extended';
   elmContainer.appendChild(elmHeading);
 
-  const [mainOptions, segmentOptions] = __YTAF_SETTINGS_ROWS__;
+  const [mainOptions, segmentOptions] = settingsRows;
   for (const key of mainOptions)
     elmContainer.appendChild(createConfigCheckbox(key));
   const elmBlock = document.createElement('blockquote');
@@ -97,7 +71,12 @@ function createOptionsPanel() {
     'keydown',
     (evt) => {
       const current = inputs.indexOf(document.activeElement);
-      const action = panelKey(evt.keyCode, current, inputs.length, groupStart);
+      const action = core.panel_key(
+        evt.keyCode,
+        current,
+        inputs.length,
+        groupStart
+      );
       if (action >= 0) inputs[action].focus();
       // YouTube also synthesizes OK events for pointer clicks. Only real
       // keyboard events need a click dispatched here.
@@ -126,7 +105,6 @@ function showOptionsPanel(visible) {
   visible ??= true;
 
   if (visible && !optionsPanelVisible) {
-    preparePanel();
     if (!optionsPanel) {
       optionsPanel = createOptionsPanel();
       document.body.appendChild(optionsPanel);
@@ -147,8 +125,8 @@ function showOptionsPanel(visible) {
 window.ytaf_showOptionsPanel = showOptionsPanel;
 
 const eventHandler = (evt) => {
-  const color = getKeyColor(evt.charCode) || getKeyColor(evt.keyCode);
-  if (color === 'green') {
+  const color = core.key_action(evt.charCode) || core.key_action(evt.keyCode);
+  if (color === 1) {
     console.debug('Taking over!');
 
     evt.preventDefault();
@@ -159,7 +137,7 @@ const eventHandler = (evt) => {
       showOptionsPanel(!optionsPanelVisible);
     }
     return false;
-  } else if (color === 'blue') {
+  } else if (color === 2) {
     evt.preventDefault();
     evt.stopPropagation();
 

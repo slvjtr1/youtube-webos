@@ -101,15 +101,9 @@ luna-send-pub -n 1 'luna://com.webos.service.eim/deleteDevice' '{"appId":"youtub
 
 ### Building an IPK
 
-The bundle embeds a WebAssembly module for SponsorBlock indexing and remote
-navigation. Rust owns the sorted segment index. C defines the settings groups
-and focus rules. The webOS user script handles DOM events and falls back to
-JavaScript when the TV cannot instantiate WebAssembly.
+The C player core owns launch routing, thumbnail URL selection, settings, remote actions, playback transitions, response filtering, SponsorBlock request hashing and segment scheduling. The webOS package embeds both WebAssembly and a JavaScript compatibility build generated from the same C sources. Browser adapters access YouTube's JavaScript objects, DOM, network, video element and storage.
 
-The compiled module is included in the checkout. After editing files in
-`native/`, install the Rust target with `rustup target add wasm32v1-none`,
-put Clang with the WebAssembly backend on PATH (or set `ZIG` to a Zig executable),
-and run `pnpm native:build` before the normal build.
+Normal builds use the checked-in compiled files. After editing `native/*.c`, run `pnpm native:build` with Clang and wasm-ld (or `ZIG` set to a Zig executable), and Binaryen wasm2js on PATH. Set `WASM2JS` to use the Node CLI from the binaryen npm package. The release was built with Zig 0.13 and Binaryen 123.
 
 ```sh
 pnpm run build:dev

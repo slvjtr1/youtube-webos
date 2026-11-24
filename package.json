@@ -1,11 +1,11 @@
 {
   "name": "youtube-webos",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Ad-free YouTube app for webOS",
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "native:build": "node tools/build-native.mjs",
+    "native:build": "node tools/build-player.mjs",
     "build": "webpack --mode=production",
     "build:dev": "webpack --mode=development",
     "package": "ares-package -n dist",
@@ -28,7 +28,6 @@
     "@babel/runtime-corejs3": "^7.29.2",
     "core-js-pure": "^3.49.0",
     "regenerator-runtime": "^0.14.1",
-    "tiny-sha256": "^1.0.2",
     "whatwg-fetch": "^3.6.20"
   },
   "devDependencies": {

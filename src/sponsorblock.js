@@ -1,6 +1,7 @@
 import { createTimeline } from './native-player';
-import sha256 from 'tiny-sha256';
-import { configRead } from './config';
+import { videoHashPrefix } from './core-runtime';
+import { core } from './core-runtime';
+import { configRead, categories as categorySettings } from './config';
 import { showNotification } from './ui';
 
 // Copied from https://github.com/ajayyy/SponsorBlock/blob/9392d16617d2d48abb6125c00e2ff6042cb7bebe/src/config.ts#L179-L233
@@ -68,16 +69,8 @@ class SponsorBlockHandler {
   }
 
   async init() {
-    const videoHash = sha256(this.videoID).substring(0, 4);
-    const categories = [
-      'sponsor',
-      'intro',
-      'outro',
-      'interaction',
-      'selfpromo',
-      'music_offtopic',
-      'preview'
-    ];
+    const videoHash = videoHashPrefix(this.videoID);
+    const categories = Array.from(categorySettings.keys());
     const resp = await fetch(
       `${sponsorblockAPI}/skipSegments/${videoHash}?categories=${encodeURIComponent(
         JSON.stringify(categories)
@@ -118,29 +111,9 @@ class SponsorBlockHandler {
   }
 
   getSkippableCategories() {
-    const skippableCategories = [];
-    if (configRead('enableSponsorBlockSponsor')) {
-      skippableCategories.push('sponsor');
-    }
-    if (configRead('enableSponsorBlockIntro')) {
-      skippableCategories.push('intro');
-    }
-    if (configRead('enableSponsorBlockOutro')) {
-      skippableCategories.push('outro');
-    }
-    if (configRead('enableSponsorBlockInteraction')) {
-      skippableCategories.push('interaction');
-    }
-    if (configRead('enableSponsorBlockSelfPromo')) {
-      skippableCategories.push('selfpromo');
-    }
-    if (configRead('enableSponsorBlockMusicOfftopic')) {
-      skippableCategories.push('music_offtopic');
-    }
-    if (configRead('enableSponsorBlockPreview')) {
-      skippableCategories.push('preview');
-    }
-    return skippableCategories;
+    return Array.from(categorySettings.keys()).filter((category) =>
+      configRead(categorySettings.get(category))
+    );
   }
 
   attachVideo() {
@@ -269,17 +242,17 @@ class SponsorBlockHandler {
     }
 
     const [start, end] = segment.segment;
-    const delay = Math.max(
-      0,
-      ((start - video.currentTime) * 1000) / video.playbackRate
-    );
+    const delay = core.skip_delay(video.currentTime, start, video.playbackRate);
     const due = Date.now() + delay;
     // Ordinary timeupdate events predict the same deadline. A seek, stall
     // or rate change can move it and must re-arm the timer.
     if (
       this.nextSkipTimeout !== null &&
-      this.scheduledSegment === segment &&
-      Math.abs(due - this.scheduledAt) < 60
+      core.keep_deadline(
+        this.scheduledSegment === segment,
+        this.scheduledAt,
+        due
+      )
     )
       return;
 
@@ -293,9 +266,13 @@ class SponsorBlockHandler {
         return;
       }
       if (
-        this.video.seeking ||
-        this.video.currentTime < start - 0.05 ||
-        this.video.currentTime >= end
+        !core.can_skip(
+          this.video.currentTime,
+          start,
+          end,
+          this.video.paused,
+          this.video.seeking
+        )
       ) {
         this.scheduleSkip();
         return;

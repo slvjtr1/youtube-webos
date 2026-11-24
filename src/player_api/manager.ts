@@ -4,25 +4,9 @@ import {
   type EventMapOf
 } from '../custom-event-target';
 import { getPlayer } from './helpers';
-import type { PlayerStateObject, VideoID, YTPlayer } from './yt-api';
+import type { VideoID, YTPlayer } from './yt-api';
 
-function diffPlayerState(
-  prev: PlayerStateObject | null,
-  next: PlayerStateObject
-) {
-  if (!prev) return next;
-
-  const changes: Partial<PlayerStateObject> = {};
-
-  for (const k in next) {
-    const key = k as keyof PlayerStateObject;
-    if (next[key] !== prev[key]) {
-      changes[key] = next[key];
-    }
-  }
-
-  return changes;
-}
+import { core } from '../core-runtime';
 
 interface EventMap {
   newVideo: CustomEvent<VideoID>;
@@ -41,7 +25,7 @@ class PlayerManager
 {
   #player;
   #lastVideoID: VideoID | null = null;
-  #lastPlayerState: PlayerStateObject | null = null;
+  #wasPlaying = false;
 
   #handleNewVideo(videoID: VideoID) {
     console.debug('[PlayerManager] new video', videoID);
@@ -50,19 +34,20 @@ class PlayerManager
 
   #handlePlayerStateChange = () => {
     const current = this.#player.getPlayerStateObject();
-    const diff = diffPlayerState(this.#lastPlayerState, current);
-    this.#lastPlayerState = current;
-
     const currentVideoID = this.currentVideoID;
-    if (!currentVideoID) return;
-
-    const isNewVideo = this.#lastVideoID !== currentVideoID;
-    if (isNewVideo) {
+    const events = core.playback_events(
+      !!currentVideoID,
+      this.#lastVideoID !== currentVideoID,
+      current.isPlaying,
+      this.#wasPlaying
+    );
+    this.#wasPlaying = current.isPlaying;
+    if (events & 1 && currentVideoID) {
       this.#lastVideoID = currentVideoID;
       this.#handleNewVideo(currentVideoID);
     }
 
-    if (current.isPlaying && (isNewVideo || diff.isPlaying)) {
+    if (events & 2) {
       this.dispatchEvent(new TypedCustomEvent('playbackStart'));
     }
   };
@@ -79,13 +64,11 @@ class PlayerManager
   }
 
   get playerMode() {
-    if (this.#player.isInline()) return PlayerMode.PREVIEW;
-
-    if (this.#player.getVideoStats().el === 'shortspage') {
-      return PlayerMode.SHORTS;
-    }
-
-    return PlayerMode.NORMAL;
+    const inline = this.#player.isInline();
+    return core.player_mode(
+      inline,
+      !inline && this.#player.getVideoStats().el === 'shortspage'
+    ) as PlayerMode;
   }
 
   get player(): YTPlayer {

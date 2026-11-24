@@ -17,9 +17,6 @@ importers:
       regenerator-runtime:
         specifier: ^0.14.1
         version: 0.14.1
-      tiny-sha256:
-        specifier: ^1.0.2
-        version: 1.0.2
       whatwg-fetch:
         specifier: ^3.6.20
         version: 3.6.20
@@ -3514,9 +3511,6 @@ packages:
 
   through@2.3.8:
     resolution: {integrity: sha512-w89qg7PI8wAdvX60bMDP+bFoD5Dvhm9oLheFp5O4a2QF0cSBGsBX4qZmadPMvVqlLJBBci+WqGGOAPvcDeNSVg==}
-
-  tiny-sha256@1.0.2:
-    resolution: {integrity: sha512-IdsPtu8eJ0SwuCWUFm2euFH3jJvtpGQC0VpZNZlqxRvQ2zGvSjbXDO+4T8Rm5ETsmCQHHvKUGds69bJYrlb3Tg==}
 
   tinyexec@1.1.1:
     resolution: {integrity: sha512-VKS/ZaQhhkKFMANmAOhhXVoIfBXblQxGX1myCQ2faQrfmobMftXeJPcZGp0gS07ocvGJWDLZGyOZDadDBqYIJg==}
@@ -7309,8 +7303,6 @@ snapshots:
       source-map-support: 0.5.21
 
   through@2.3.8: {}
-
-  tiny-sha256@1.0.2: {}
 
   tinyexec@1.1.1: {}
 

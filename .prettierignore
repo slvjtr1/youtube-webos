@@ -1,2 +1,3 @@
 *-polyfill.*
 pnpm-lock.yaml
+native/player-legacy.js

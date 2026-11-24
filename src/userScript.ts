@@ -12,9 +12,8 @@ document.addEventListener(
 );
 
 import './app_api/index';
-import './adblock.js';
+import './response-filter';
 import './hooks/json-stringify';
-import './shorts.js';
 import './sponsorblock.js';
 import './ui.js';
 import './font-fix.css';
@@ -24,7 +23,6 @@ import './yt-fixes.css';
 import './watch.js';
 import './video-quality';
 import './lang-settings-fix';
-import './remove-endscreen';
 import './hooks';
 import './block-webos-cast';
 import './auto-account-select';
