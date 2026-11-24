@@ -1,0 +1,16 @@
+{
+  "paging": {
+    "page": 1,
+    "count": 1,
+    "maxPage": 1,
+    "itemsTotal": 1
+  },
+  "packages": [
+    {
+      "id": "youtube.leanback.v4",
+      "title": "YouTube AdFree",
+      "iconUri": "https://raw.githubusercontent.com/slvjtr1/youtube-webos/main/assets/largeIcon.png",
+      "manifestUrl": "https://github.com/slvjtr1/youtube-webos/releases/latest/download/youtube.leanback.v4.manifest.json"
+    }
+  ]
+}

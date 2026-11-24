@@ -1,9 +1,12 @@
 const CONTENT_INTENT_REGEX = /^.+(?=Content)/g;
 
 export function extractLaunchParams() {
-  if (window.launchParams) {
-    return JSON.parse(window.launchParams);
-  } else {
+  if (!window.launchParams) return {};
+
+  try {
+    return JSON.parse(window.launchParams) ?? {};
+  } catch (error) {
+    console.warn('Ignoring invalid webOS launch parameters:', error);
     return {};
   }
 }
@@ -26,7 +29,7 @@ function concatSearchParams(a, b) {
   return new URLSearchParams([...a.entries(), ...b.entries()]);
 }
 
-export function handleLaunch(params) {
+export function handleLaunch(params = {}) {
   console.info('handleLaunch', params);
   let ytURL = getYTURL();
 
@@ -34,7 +37,7 @@ export function handleLaunch(params) {
   // parameter do not respect "handlesRelaunch" appinfo option. We still
   // fallback to "contentTarget" if our custom param is not specified.
   //
-  let { target, contentTarget = target } = params;
+  let { target, contentTarget = target } = params ?? {};
 
   /** TODO: Handle google assistant
    * Sample: {contentTarget: "v=v=<ID>", storeCaller: "voice", subReason: "voiceAgent", voiceEngine: "googleAssistant"}
@@ -59,6 +62,8 @@ export function handleLaunch(params) {
       break;
     }
     case 'object': {
+      if (typeof contentTarget?.intent !== 'string') break;
+
       console.info('Voice launch');
 
       const { intent, intentParam } = contentTarget;

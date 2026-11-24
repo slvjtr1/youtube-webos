@@ -8,7 +8,10 @@ if (!outfile) throw new Error('Usage: gen-manifest <outfile>');
 
 const appinfo = require('../assets/appinfo.json');
 const pkgJson = require('../package.json');
+const repository = pkgJson.repository.replace(/^github:/, '');
+const sourceUrl = `https://github.com/${repository}`;
 const ipkfile = `${appinfo.id}_${pkgJson.version}_all.ipk`;
+const releaseTag = process.argv[3] || process.env.GITHUB_REF_NAME;
 const ipkhash = crypto
   .createHash('sha256')
   .update(fs.readFileSync(ipkfile))
@@ -22,11 +25,12 @@ fs.writeFileSync(
     type: appinfo.type,
     title: appinfo.title,
     // appDescription: appinfo.appDescription,
-    iconUri:
-      'https://raw.githubusercontent.com/webosbrew/youtube-webos/main/assets/largeIcon.png',
-    sourceUrl: 'https://github.com/webosbrew/youtube-webos',
+    iconUri: `https://raw.githubusercontent.com/${repository}/main/assets/largeIcon.png`,
+    sourceUrl,
     rootRequired: false,
-    ipkUrl: ipkfile,
+    ipkUrl: releaseTag
+      ? `${sourceUrl}/releases/download/${encodeURIComponent(releaseTag)}/${ipkfile}`
+      : ipkfile,
     ipkHash: {
       sha256: ipkhash
     }

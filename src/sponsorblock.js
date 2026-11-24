@@ -80,7 +80,11 @@ class SponsorBlockHandler {
         JSON.stringify(categories)
       )}`
     );
+    if (resp.status === 404 || !this.active) return;
+    if (!resp.ok) throw new Error(`SponsorBlock returned HTTP ${resp.status}`);
+
     const results = await resp.json();
+    if (!this.active || !Array.isArray(results)) return;
 
     const result = results.find((v) => v.videoID === this.videoID);
     console.debug(this.videoID, 'Got it:', result);
@@ -201,6 +205,7 @@ class SponsorBlockHandler {
           case 2: {
             // Slider has no markers or auto-markers
             this.slider = last.querySelector('[idomkey=slider]');
+            if (!this.slider) return;
             break;
           }
           default: {
@@ -371,16 +376,14 @@ window.addEventListener(
     // uninitialize sponsorblock when not on `/watch` path, to prevent
     // it from attaching to playback preview video element loaded on
     // home page
-    if (newURL.pathname !== '/watch' && window.sponsorblock) {
-      console.debug('uninitializing sponsorblock on a non-video page');
+    const videoID = newURL.searchParams.get('v');
+    if (newURL.pathname !== '/watch' || !videoID) {
       uninitializeSponsorblock();
       return;
     }
 
-    const videoID = newURL.searchParams.get('v');
     const needsReload =
-      videoID &&
-      (!window.sponsorblock || window.sponsorblock.videoID != videoID);
+      !window.sponsorblock || window.sponsorblock.videoID !== videoID;
 
     console.debug(
       'hashchange',
@@ -394,8 +397,13 @@ window.addEventListener(
       uninitializeSponsorblock();
 
       if (configRead('enableSponsorBlock')) {
-        window.sponsorblock = new SponsorBlockHandler(videoID);
-        window.sponsorblock.init();
+        const handler = new SponsorBlockHandler(videoID);
+        window.sponsorblock = handler;
+        handler.init().catch((err) => {
+          if (window.sponsorblock !== handler) return;
+          console.warn('SponsorBlock initialization failed:', err);
+          uninitializeSponsorblock();
+        });
       } else {
         console.info('SponsorBlock disabled, not loading');
       }

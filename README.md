@@ -46,13 +46,15 @@
 
 ## Installation
 
-You can install the app using one of the following methods:
+In [Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel), open Settings, choose Add Repository, and enter this URL.
 
-- **[webOS Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel):**
-  App is available in the official webOS Brew repository.
-- **[Device Manager](https://github.com/webosbrew/dev-manager-desktop):**
-  Use a pre-built `.ipk` file from the [Releases](https://github.com/webosbrew/youtube-webos/releases) page.
-- **Command Line (webOS CLI):** Configure the tools [below](#development-setup)
+```text
+https://raw.githubusercontent.com/slvjtr1/youtube-webos/main/repo.json
+```
+
+Then install **YouTube AdFree** from the catalog.
+
+For manual installation, open the IPK from [this fork's releases](https://github.com/slvjtr1/youtube-webos/releases/latest) in [webOS Dev Manager](https://github.com/webosbrew/dev-manager-desktop). For CLI installation, follow [Development Setup](#development-setup).
 
 ---
 
