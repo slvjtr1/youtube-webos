@@ -101,6 +101,16 @@ luna-send-pub -n 1 'luna://com.webos.service.eim/deleteDevice' '{"appId":"youtub
 
 ### Building an IPK
 
+The bundle embeds a WebAssembly module for SponsorBlock indexing and remote
+navigation. Rust owns the sorted segment index. C defines the settings groups
+and focus rules. The webOS user script handles DOM events and falls back to
+JavaScript when the TV cannot instantiate WebAssembly.
+
+The compiled module is included in the checkout. After editing files in
+`native/`, install the Rust target with `rustup target add wasm32v1-none`,
+put Clang with the WebAssembly backend on PATH (or set `ZIG` to a Zig executable),
+and run `pnpm native:build` before the normal build.
+
 ```sh
 pnpm run build:dev
 pnpm run package

@@ -4,6 +4,7 @@
   left: 10%;
   right: 10%;
   bottom: 10%;
+  overflow-y: auto;
 
   background: rgba(18, 18, 18, 0.9);
   backdrop-filter: blur(23px);

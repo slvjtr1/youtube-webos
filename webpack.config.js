@@ -1,9 +1,25 @@
+/// <reference lib="dom" />
 import CopyPlugin from 'copy-webpack-plugin';
 import { TransformAsyncModulesPlugin } from 'transform-async-modules-webpack-plugin';
 import TerserPlugin from 'terser-webpack-plugin';
 import pkgJson from './package.json' with { type: 'json' };
 import webpack from 'webpack';
+import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
+
+const coreBytes = readFileSync(
+  new URL('./native/player.wasm', import.meta.url)
+);
+const core =
+  /** @type {{ memory: WebAssembly.Memory, settings_rows(): number }} */ (
+    new WebAssembly.Instance(new WebAssembly.Module(coreBytes)).exports
+  );
+const layout = Buffer.from(core.memory.buffer);
+const start = core.settings_rows();
+const settingsRows = layout
+  .toString('utf8', start, layout.indexOf(0, start))
+  .split('\n\n')
+  .map((group) => group.split('\n'));
 
 /**
  * @param input {Buffer<ArrayBufferLike>}
@@ -46,6 +62,7 @@ const makeConfig = (_env, argv) => [
 
     module: {
       rules: [
+        { test: /\.wasm$/, type: 'asset/inline' },
         {
           test: /\.[mc]?[jt]s$/i,
 
@@ -107,7 +124,8 @@ const makeConfig = (_env, argv) => [
         }
       }),
       new webpack.DefinePlugin({
-        __YTAF_VERSION__: JSON.stringify(pkgJson.version)
+        __YTAF_VERSION__: JSON.stringify(pkgJson.version),
+        __YTAF_SETTINGS_ROWS__: JSON.stringify(settingsRows)
       })
     ]
   }

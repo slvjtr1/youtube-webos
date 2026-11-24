@@ -15,6 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-env
+      - run: node --test test/native.test.mjs
       - run: pnpm run "/^build|^lint:all/"
       - run: pnpm run test:compat
       - run: pnpm run package

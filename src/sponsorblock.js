@@ -1,3 +1,4 @@
+import { createTimeline } from './native-player';
 import sha256 from 'tiny-sha256';
 import { configRead } from './config';
 import { showNotification } from './ui';
@@ -49,6 +50,8 @@ class SponsorBlockHandler {
 
   attachVideoTimeout = null;
   nextSkipTimeout = null;
+  scheduledSegment = null;
+  scheduledAt = 0;
 
   slider = null;
   sliderInterval = null;
@@ -58,7 +61,7 @@ class SponsorBlockHandler {
   scheduleSkipHandler = null;
   durationChangeHandler = null;
   segments = null;
-  skippableCategories = [];
+  nextSegment = null;
 
   constructor(videoID) {
     this.videoID = videoID;
@@ -94,8 +97,18 @@ class SponsorBlockHandler {
       return;
     }
 
-    this.segments = result.segments;
-    this.skippableCategories = this.getSkippableCategories();
+    this.segments = result.segments.filter(
+      (item) =>
+        Array.isArray(item?.segment) &&
+        Number.isFinite(item.segment[0]) &&
+        Number.isFinite(item.segment[1]) &&
+        item.segment[1] > item.segment[0]
+    );
+    this.nextSegment = await createTimeline(
+      this.segments,
+      this.getSkippableCategories()
+    );
+    if (!this.active) return;
 
     this.scheduleSkipHandler = () => this.scheduleSkip();
     this.durationChangeHandler = () => this.buildOverlay();
@@ -146,6 +159,8 @@ class SponsorBlockHandler {
     this.video.addEventListener('play', this.scheduleSkipHandler);
     this.video.addEventListener('pause', this.scheduleSkipHandler);
     this.video.addEventListener('timeupdate', this.scheduleSkipHandler);
+    this.video.addEventListener('ratechange', this.scheduleSkipHandler);
+    this.video.addEventListener('seeked', this.scheduleSkipHandler);
     this.video.addEventListener('durationchange', this.durationChangeHandler);
   }
 
@@ -243,68 +258,55 @@ class SponsorBlockHandler {
   }
 
   scheduleSkip() {
-    clearTimeout(this.nextSkipTimeout);
-    this.nextSkipTimeout = null;
-
-    if (!this.active) {
-      console.debug(this.videoID, 'No longer active, ignoring...');
+    const video = this.video;
+    const playing =
+      this.active && !video.paused && !video.seeking && video.playbackRate > 0;
+    const segment = playing && this.nextSegment(video.currentTime);
+    if (!segment) {
+      clearTimeout(this.nextSkipTimeout);
+      this.nextSkipTimeout = null;
       return;
     }
 
-    if (this.video.paused) {
-      console.debug(this.videoID, 'Currently paused, ignoring...');
-      return;
-    }
-
-    // Sometimes timeupdate event (that calls scheduleSkip) gets fired right before
-    // already scheduled skip routine below. Let's just look back a little bit
-    // and, in worst case, perform a skip at negative interval (immediately)...
-    const nextSegments = this.segments.filter(
-      (seg) =>
-        seg.segment[0] > this.video.currentTime - 0.3 &&
-        seg.segment[1] > this.video.currentTime - 0.3
-    );
-    nextSegments.sort((s1, s2) => s1.segment[0] - s2.segment[0]);
-
-    if (!nextSegments.length) {
-      console.debug(this.videoID, 'No more segments');
-      return;
-    }
-
-    const [segment] = nextSegments;
     const [start, end] = segment.segment;
-    console.debug(
-      this.videoID,
-      'Scheduling skip of',
-      segment,
-      'in',
-      start - this.video.currentTime
+    const delay = Math.max(
+      0,
+      ((start - video.currentTime) * 1000) / video.playbackRate
     );
+    const due = Date.now() + delay;
+    // Ordinary timeupdate events predict the same deadline. A seek, stall
+    // or rate change can move it and must re-arm the timer.
+    if (
+      this.nextSkipTimeout !== null &&
+      this.scheduledSegment === segment &&
+      Math.abs(due - this.scheduledAt) < 60
+    )
+      return;
 
-    this.nextSkipTimeout = setTimeout(
-      () => {
-        if (this.video.paused) {
-          console.debug(this.videoID, 'Currently paused, ignoring...');
-          return;
-        }
-        if (!this.skippableCategories.includes(segment.category)) {
-          console.debug(
-            this.videoID,
-            'Segment',
-            segment.category,
-            'is not skippable, ignoring...'
-          );
-          return;
-        }
-
-        const skipName = barTypes[segment.category]?.name || segment.category;
-        console.debug(this.videoID, 'Skipping', segment);
-        showNotification(`Skipping ${skipName}`, 2000, 'indigo');
-        this.video.currentTime = end;
+    clearTimeout(this.nextSkipTimeout);
+    this.scheduledSegment = segment;
+    this.scheduledAt = due;
+    this.nextSkipTimeout = setTimeout(() => {
+      this.nextSkipTimeout = null;
+      if (this.video.paused) {
+        console.debug(this.videoID, 'Currently paused, ignoring...');
+        return;
+      }
+      if (
+        this.video.seeking ||
+        this.video.currentTime < start - 0.05 ||
+        this.video.currentTime >= end
+      ) {
         this.scheduleSkip();
-      },
-      (start - this.video.currentTime) * 1000
-    );
+        return;
+      }
+
+      const skipName = barTypes[segment.category]?.name || segment.category;
+      console.debug(this.videoID, 'Skipping', segment);
+      showNotification(`Skipping ${skipName}`, 2000, 'indigo');
+      this.video.currentTime = end;
+      this.scheduleSkip();
+    }, delay);
   }
 
   destroy() {
@@ -341,6 +343,8 @@ class SponsorBlockHandler {
       this.video.removeEventListener('play', this.scheduleSkipHandler);
       this.video.removeEventListener('pause', this.scheduleSkipHandler);
       this.video.removeEventListener('timeupdate', this.scheduleSkipHandler);
+      this.video.removeEventListener('ratechange', this.scheduleSkipHandler);
+      this.video.removeEventListener('seeked', this.scheduleSkipHandler);
       this.video.removeEventListener(
         'durationchange',
         this.durationChangeHandler

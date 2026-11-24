@@ -1,5 +1,5 @@
-/*global navigate, __YTAF_VERSION__*/
-import './spatial-navigation-polyfill.js';
+/*global __YTAF_VERSION__, __YTAF_SETTINGS_ROWS__*/
+import { panelKey, preparePanel } from './native-player';
 import {
   configAddChangeListener,
   configRead,
@@ -8,11 +8,6 @@ import {
 } from './config.js';
 import './ui.css';
 import { requireElement } from './player_api/helpers';
-
-// We handle key events ourselves.
-window.__spatialNavigation__.keyMode = 'NONE';
-
-const ARROW_KEY_CODE = { 37: 'left', 38: 'up', 39: 'right', 40: 'down' };
 
 const colorCodeMap = new Map([
   [403, 'red'],
@@ -72,76 +67,16 @@ function createOptionsPanel() {
   elmContainer.style['display'] = 'none';
   elmContainer.setAttribute('tabindex', 0);
 
-  elmContainer.addEventListener(
-    'focus',
-    () => console.debug('Options panel focused!'),
-    true
-  );
-  elmContainer.addEventListener(
-    'blur',
-    () => console.debug('Options panel blurred!'),
-    true
-  );
-
-  elmContainer.addEventListener(
-    'keydown',
-    (evt) => {
-      console.debug('Options panel key event:', evt.type, evt.charCode);
-
-      if (getKeyColor(evt.charCode) === 'green') {
-        return;
-      }
-
-      if (evt.keyCode in ARROW_KEY_CODE) {
-        navigate(ARROW_KEY_CODE[evt.keyCode]);
-      } else if (evt.keyCode === 13) {
-        // "OK" button
-
-        /**
-         * The YouTube app generates these "OK" events from clicks (including
-         * with the Magic Remote), and we don't want to send a duplicate click
-         * event for those. Youtube uses the `Event` class instead of
-         * `KeyboardEvent` so we check for that.
-         * See issue #143 and #200 for context.
-         */
-        if (evt instanceof KeyboardEvent) {
-          document.activeElement.click();
-        }
-      } else if (evt.keyCode === 27) {
-        // Back button
-        showOptionsPanel(false);
-      }
-
-      evt.preventDefault();
-      evt.stopPropagation();
-    },
-    true
-  );
-
   const elmHeading = document.createElement('h1');
   elmHeading.textContent = 'webOS YouTube Extended';
   elmContainer.appendChild(elmHeading);
 
-  elmContainer.appendChild(createConfigCheckbox('enableAdBlock'));
-  elmContainer.appendChild(createConfigCheckbox('upgradeThumbnails'));
-  elmContainer.appendChild(createConfigCheckbox('hideLogo'));
-  elmContainer.appendChild(createConfigCheckbox('showWatch'));
-  elmContainer.appendChild(createConfigCheckbox('removeShorts'));
-  elmContainer.appendChild(createConfigCheckbox('forceHighResVideo'));
-  elmContainer.appendChild(createConfigCheckbox('removeEndscreen'));
-  elmContainer.appendChild(createConfigCheckbox('autoAccountSelect'));
-  elmContainer.appendChild(createConfigCheckbox('enableSponsorBlock'));
-
+  const [mainOptions, segmentOptions] = __YTAF_SETTINGS_ROWS__;
+  for (const key of mainOptions)
+    elmContainer.appendChild(createConfigCheckbox(key));
   const elmBlock = document.createElement('blockquote');
-
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockSponsor'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockIntro'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockOutro'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockInteraction'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockSelfPromo'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockMusicOfftopic'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockPreview'));
-
+  for (const key of segmentOptions)
+    elmBlock.appendChild(createConfigCheckbox(key));
   elmContainer.appendChild(elmBlock);
 
   const elmSponsorLink = document.createElement('small');
@@ -156,11 +91,30 @@ function createOptionsPanel() {
 
   elmContainer.appendChild(version);
 
+  const inputs = Array.from(elmContainer.querySelectorAll('input'));
+  const groupStart = inputs.indexOf(elmBlock.querySelector('input'));
+  elmContainer.addEventListener(
+    'keydown',
+    (evt) => {
+      const current = inputs.indexOf(document.activeElement);
+      const action = panelKey(evt.keyCode, current, inputs.length, groupStart);
+      if (action >= 0) inputs[action].focus();
+      // YouTube also synthesizes OK events for pointer clicks. Only real
+      // keyboard events need a click dispatched here.
+      if (action === -2 && evt instanceof KeyboardEvent)
+        inputs[current].click();
+      if (action === -3) showOptionsPanel(false);
+      evt.preventDefault();
+      evt.stopPropagation();
+    },
+    true
+  );
+
   return elmContainer;
 }
 
-const optionsPanel = createOptionsPanel();
-document.body.appendChild(optionsPanel);
+let optionsPanel;
+let previousFocus;
 
 let optionsPanelVisible = false;
 
@@ -172,14 +126,20 @@ function showOptionsPanel(visible) {
   visible ??= true;
 
   if (visible && !optionsPanelVisible) {
-    console.debug('Showing and focusing options panel!');
+    preparePanel();
+    if (!optionsPanel) {
+      optionsPanel = createOptionsPanel();
+      document.body.appendChild(optionsPanel);
+    }
+    previousFocus = document.activeElement;
     optionsPanel.style.display = 'block';
-    optionsPanel.focus();
+    optionsPanel.querySelector('input').focus();
     optionsPanelVisible = true;
   } else if (!visible && optionsPanelVisible) {
     console.debug('Hiding options panel!');
     optionsPanel.style.display = 'none';
-    optionsPanel.blur();
+    if (previousFocus && document.body.contains(previousFocus))
+      previousFocus.focus();
     optionsPanelVisible = false;
   }
 }
@@ -187,15 +147,8 @@ function showOptionsPanel(visible) {
 window.ytaf_showOptionsPanel = showOptionsPanel;
 
 const eventHandler = (evt) => {
-  console.debug(
-    'Key event:',
-    evt.type,
-    evt.charCode,
-    evt.keyCode,
-    evt.defaultPrevented
-  );
-
-  if (getKeyColor(evt.charCode) === 'green') {
+  const color = getKeyColor(evt.charCode) || getKeyColor(evt.keyCode);
+  if (color === 'green') {
     console.debug('Taking over!');
 
     evt.preventDefault();
@@ -206,7 +159,7 @@ const eventHandler = (evt) => {
       showOptionsPanel(!optionsPanelVisible);
     }
     return false;
-  } else if (getKeyColor(evt.charCode) === 'blue') {
+  } else if (color === 'blue') {
     evt.preventDefault();
     evt.stopPropagation();
 
